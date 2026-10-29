@@ -80,6 +80,11 @@ export default function KanbanBoard() {
     if (!draggedItem) return;
 
     const { col: fromCol, id } = draggedItem;
+    if (fromCol === targetCol) {
+      setDraggedItem(null);
+      return;
+    }
+
     const task = board[fromCol].find(t => t.id === id);
     if (!task) return;
 
