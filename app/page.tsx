@@ -1,69 +1,130 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+
+interface Task {
+  id: string;
+  content: string;
+}
+
+interface BoardData {
+  todo: Task[];
+  progress: Task[];
+  done: Task[];
+}
+
+export default function KanbanBoard() {
+  const [board, setBoard] = useState<BoardData>({
+    todo: [],
+    progress: [],
+    done: []
+  });
+  const [draggedItem, setDraggedItem] = useState<{ col: keyof BoardData; id: string } | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('kanban');
+    if (saved) {
+      setBoard(JSON.parse(saved));
+    }
+  }, []);
+
+  const saveBoard = (newBoard: BoardData) => {
+    setBoard(newBoard);
+    localStorage.setItem('kanban', JSON.stringify(newBoard));
+  };
+
+  const addCard = (col: keyof BoardData) => {
+    const newTask: Task = {
+      id: Date.now().toString(),
+      content: 'New task'
+    };
+    saveBoard({ ...board, [col]: [...board[col], newTask] });
+  };
+
+  const updateCard = (col: keyof BoardData, id: string, content: string) => {
+    const updated = board[col].map(task =>
+      task.id === id ? { ...task, content } : task
+    );
+    saveBoard({ ...board, [col]: updated });
+  };
+
+  const deleteCard = (col: keyof BoardData, id: string) => {
+    const filtered = board[col].filter(task => task.id !== id);
+    saveBoard({ ...board, [col]: filtered });
+  };
+
+  const handleDragStart = (col: keyof BoardData, id: string) => {
+    setDraggedItem({ col, id });
+  };
+
+  const handleDrop = (targetCol: keyof BoardData) => {
+    if (!draggedItem) return;
+
+    const { col: fromCol, id } = draggedItem;
+    const task = board[fromCol].find(t => t.id === id);
+    if (!task) return;
+
+    const newBoard = {
+      ...board,
+      [fromCol]: board[fromCol].filter(t => t.id !== id),
+      [targetCol]: [...board[targetCol], task]
+    };
+
+    saveBoard(newBoard);
+    setDraggedItem(null);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-white mb-8">Kanban Board</h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {(['todo', 'progress', 'done'] as const).map(col => (
+            <div
+              key={col}
+              className="bg-slate-800/50 backdrop-blur rounded-lg p-4 min-h-[500px]"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(col)}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <h2 className="text-xl font-semibold text-white mb-4 uppercase tracking-wide">
+                {col === 'todo' ? 'To Do' : col === 'progress' ? 'In Progress' : 'Done'}
+              </h2>
+
+              <div className="space-y-3 mb-4">
+                {board[col].map(task => (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={() => handleDragStart(col, task.id)}
+                    className="bg-slate-700 rounded-lg p-3 cursor-move hover:bg-slate-600 transition-colors group relative"
+                  >
+                    <button
+                      onClick={() => deleteCard(col, task.id)}
+                      className="absolute top-2 right-2 text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                    <textarea
+                      value={task.content}
+                      onChange={(e) => updateCard(col, task.id, e.target.value)}
+                      className="w-full bg-transparent text-white resize-none outline-none pr-6"
+                      rows={2}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => addCard(col)}
+                className="w-full py-2 border-2 border-dashed border-slate-600 rounded-lg text-slate-400 hover:border-purple-500 hover:text-purple-400 transition-colors"
+              >
+                + Add card
+              </button>
+            </div>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
