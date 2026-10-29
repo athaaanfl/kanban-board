@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
   DndContext,
@@ -212,11 +212,7 @@ function KanbanBoard() {
     })
   );
 
-  useEffect(() => {
-    loadBoard();
-  }, [boardId]);
-
-  const loadBoard = async () => {
+  const loadBoard = useCallback(async () => {
     try {
       const res = await fetch(`/api/board/${boardId}`);
       if (res.ok) {
@@ -253,11 +249,15 @@ function KanbanBoard() {
         }
       }
     } catch (error) {
-      console.error('Failed to load board');
+      console.error('Failed to load board', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [boardId]);
+
+  useEffect(() => {
+    loadBoard();
+  }, [loadBoard]);
 
   const saveBoard = async (newBoard: BoardData) => {
     setBoard(newBoard);
@@ -278,7 +278,7 @@ function KanbanBoard() {
   const addCard = (col: keyof BoardData) => {
     const maxOrder = board[col].reduce((max, task) => Math.max(max, task.order || 0), 0);
     const newTask: Task = {
-      id: Date.now().toString(),
+      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: '',
       description: '',
       priority: 'medium',
