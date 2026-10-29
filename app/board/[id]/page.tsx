@@ -221,13 +221,36 @@ function KanbanBoard() {
       const res = await fetch(`/api/board/${boardId}`);
       if (res.ok) {
         const data = await res.json();
-        // Sort tasks by order
-        const sortedData: BoardData = {
-          todo: (data.todo || []).sort((a: Task, b: Task) => (a.order || 0) - (b.order || 0)),
-          progress: (data.progress || []).sort((a: Task, b: Task) => (a.order || 0) - (b.order || 0)),
-          done: (data.done || []).sort((a: Task, b: Task) => (a.order || 0) - (b.order || 0))
+        
+        // Migration: add order field to tasks that don't have it
+        const migrateColumn = (tasks: Task[]) => {
+          return tasks.map((task, index) => ({
+            ...task,
+            order: task.order !== undefined ? task.order : index
+          })).sort((a, b) => a.order - b.order);
         };
+        
+        const sortedData: BoardData = {
+          todo: migrateColumn(data.todo || []),
+          progress: migrateColumn(data.progress || []),
+          done: migrateColumn(data.done || [])
+        };
+        
         setBoard(sortedData);
+        
+        // Save migrated data back if any tasks were missing order
+        const needsMigration = 
+          (data.todo || []).some((t: Task) => t.order === undefined) ||
+          (data.progress || []).some((t: Task) => t.order === undefined) ||
+          (data.done || []).some((t: Task) => t.order === undefined);
+        
+        if (needsMigration) {
+          await fetch(`/api/board/${boardId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sortedData)
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to load board');
@@ -261,7 +284,15 @@ function KanbanBoard() {
       priority: 'medium',
       order: maxOrder + 1
     };
-    saveBoard({ ...board, [col]: [...board[col], newTask] });
+    const newBoard = { ...board, [col]: [...board[col], newTask] };
+    saveBoard(newBoard);
+    
+    // Auto-focus on new card title after a short delay
+    setTimeout(() => {
+      const cards = document.querySelectorAll(`[data-column="${col}"] h3`);
+      const lastCard = cards[cards.length - 1] as HTMLElement;
+      if (lastCard) lastCard.click();
+    }, 100);
   };
 
   const updateCard = (col: keyof BoardData, id: string, updates: Partial<Task>) => {
@@ -439,6 +470,7 @@ function KanbanBoard() {
                     <div
                       className="flex-1 space-y-2 min-h-[400px] p-1"
                       id={col}
+                      data-column={col}
                     >
                       {tasks.map(task => (
                         <TaskCard
