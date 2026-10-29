@@ -52,7 +52,7 @@ function KanbanBoard() {
       const res = await fetch(`/api/board/${boardId}`);
       if (res.ok) {
         const data = await res.json();
-        setBoard(JSON.parse(data));
+        setBoard(data);
       }
     } catch (error) {
       console.error('Failed to load board');

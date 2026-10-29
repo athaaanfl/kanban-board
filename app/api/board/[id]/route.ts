@@ -30,7 +30,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    await redis.set(`board:${id}`, JSON.stringify(body));
+    await redis.set(`board:${id}`, body);
     
     return Response.json({ success: true });
   } catch (error) {
